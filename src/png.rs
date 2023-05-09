@@ -20,11 +20,11 @@ impl Png {
         }
     }
 
-    fn append_chunk(&mut self, chunk: Chunk) {
+    pub fn append_chunk(&mut self, chunk: Chunk) {
         self.chunks.push(chunk);
     }
 
-    fn remove_chunk(&mut self, chunk_type: &str) -> Result<Chunk> {
+    pub fn remove_chunk(&mut self, chunk_type: &str) -> Result<Chunk> {
         if let Some(chunk) = self.chunks.pop() {
             Ok(chunk)
         } else {
@@ -40,7 +40,7 @@ impl Png {
         &self.chunks
     }
 
-    fn chunk_by_type(&self, chunk_type: &str) -> Option<&Chunk> {
+    pub fn chunk_by_type(&self, chunk_type: &str) -> Option<&Chunk> {
         for chunk in &self.chunks {
             if chunk.chunk_type().bytes() == chunk_type.as_bytes() {
                 return Some(&chunk);
@@ -49,7 +49,7 @@ impl Png {
         None
     }
 
-    fn as_bytes(&self) -> Vec<u8> {
+    pub fn as_bytes(&self) -> Vec<u8> {
         self.header
             .into_iter()
             .chain(self.chunks.iter().flat_map(|chunk| chunk.as_bytes()))
@@ -72,12 +72,39 @@ impl TryFrom<&[u8]> for Png {
             return Err("Header incorrect")?;
         }
 
+        let mut chunks = Vec::<Chunk>::new();
+
+        // read length of data chunk
+        let mut chunk_length_buffer: [u8; 4] = [0; 4];
+        while let Ok(_) = reader.read_exact(&mut chunk_length_buffer) {
+            // create vector of length chunk
+            let chunk_length = usize::try_from(u32::from_be_bytes(chunk_length_buffer))?;
+
+            // extend the chunk length by 8 for chunk type and CRC
+            let mut chunk_data = vec![0; chunk_length + 8];
+            reader.read_exact(&mut chunk_data)?;
+
+            let mut chunk_bytes = chunk_length_buffer.to_vec();
+            chunk_bytes.extend(&chunk_data);
+
+            let chunk = Chunk::try_from(&chunk_bytes[..])?;
+
+            chunks.push(chunk);
+        }
+
+        return Ok(Png {
+            header: Png::STANDARD_HEADER,
+            chunks,
+        });
     }
 }
 
 impl Display for Png {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        for chunk in &self.chunks {
+            write!(f, "{}", chunk)?;
+        }
+        Ok(())
     }
 }
 
@@ -105,7 +132,6 @@ mod tests {
     }
 
     fn chunk_from_strings(chunk_type: &str, data: &str) -> Result<Chunk> {
-
         let chunk_type = ChunkType::from_str(chunk_type)?;
         let data: Vec<u8> = data.bytes().collect();
 
