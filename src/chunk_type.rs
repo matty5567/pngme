@@ -36,7 +36,7 @@ impl ChunkType {
     }
 
     pub fn is_safe_to_copy(&self) -> bool {
-        matches!(self.data >> 5 & 1, 0)
+        !matches!(self.data >> 5 & 1, 0)
     }
 }
 

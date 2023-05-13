@@ -56,10 +56,6 @@ impl Png {
         }
     }
 
-    // fn header(&self) -> &[u8; 8] {
-    //     &self.header
-    // }
-
     fn chunks(&self) -> &[Chunk] {
         &self.chunks
     }
