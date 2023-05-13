@@ -1,55 +1,42 @@
-#![allow(unused_variables)]
+#![allow(unused_variables, dead_code)]
 
-use std::{str::FromStr, str::from_utf8, fmt::Display};
-
+use std::{fmt::Display, str::from_utf8, str::FromStr};
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct ChunkType {
-    data: u32
+    data: u32,
 }
 
 impl ChunkType {
-    pub fn bytes(&self) -> [u8;4] {
+    pub fn bytes(&self) -> [u8; 4] {
         self.data.to_be_bytes()
     }
 
     pub fn is_valid(&self) -> bool {
         let chars = &self.data.to_be_bytes();
-        
+
         for char in chars {
             if !(char.is_ascii_lowercase() || char.is_ascii_uppercase()) {
                 return false;
             }
-        };
+        }
         self.is_reserved_bit_valid()
     }
 
     pub fn is_critical(&self) -> bool {
-        match self.data >> 29 & 1 {
-            0 => true,
-            _ => false,
-        }
+        matches!(self.data >> 29 & 1, 0)
     }
 
     pub fn is_public(&self) -> bool {
-        match self.data >> 21 & 1 {
-            0 => true,
-            _ => false,
-        }
+        matches!(self.data >> 21 & 1, 0)
     }
 
     pub fn is_reserved_bit_valid(&self) -> bool {
-        match self.data >> 13 & 1 {
-            0 => true,
-            _ => false,
-        }
+        matches!(self.data >> 13 & 1, 0)
     }
 
     pub fn is_safe_to_copy(&self) -> bool {
-        match self.data >> 5 & 1 {
-            1 => true,
-            _ => false,
-        }
+        matches!(self.data >> 5 & 1, 0)
     }
 }
 
@@ -57,12 +44,12 @@ impl TryFrom<[u8; 4]> for ChunkType {
     type Error = String;
 
     fn try_from(value: [u8; 4]) -> Result<Self, Self::Error> {
-        let data = ((value[0] as u32) << 24) +
-            ((value[1] as u32) << 16 )+
-            ((value[2] as u32) <<  8 )+
-            ((value[3] as u32) <<  0 );
+        let data = ((value[0] as u32) << 24)
+            + ((value[1] as u32) << 16)
+            + ((value[2] as u32) << 8)
+            + (value[3] as u32);
 
-        return Result::Ok(ChunkType {data})
+        Result::Ok(ChunkType { data })
     }
 }
 
@@ -70,15 +57,18 @@ impl FromStr for ChunkType {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-
-        if s.bytes().len() > 4  || !s.bytes().all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_uppercase()) {
-            return Result::Err(String::from("String must 4 ascii alphabetic chars"));
-        } else{
+        if s.bytes().len() > 4
+            || !s
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_uppercase())
+        {
+            Result::Err(String::from("String must 4 ascii alphabetic chars"))
+        } else {
             let bytes: [u8; 4] = s.as_bytes().try_into().unwrap();
             if let Ok(chunk_type) = ChunkType::try_from(bytes) {
-                return Result::Ok(chunk_type)
+                Result::Ok(chunk_type)
             } else {
-                return Result::Err(String::from("failed to convert to bytes"))
+                Result::Err(String::from("failed to convert to bytes"))
             }
         }
     }
@@ -188,4 +178,3 @@ mod tests {
         let _are_chunks_equal = chunk_type_1 == chunk_type_2;
     }
 }
-

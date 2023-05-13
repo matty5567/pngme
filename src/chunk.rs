@@ -7,6 +7,7 @@ use crate::chunk_type::ChunkType;
 use crate::{Error, Result};
 use crc::{Crc, CRC_32_ISO_HDLC};
 
+#[derive(Debug)]
 pub struct Chunk {
     length: u32,
     chunk_type: ChunkType,
@@ -28,10 +29,6 @@ impl Chunk {
 
     pub fn chunk_type(&self) -> &ChunkType {
         &self.chunk_type
-    }
-
-    pub fn data(&self) -> &[u8] {
-        &self.chunk_data
     }
 
     pub fn crc(&self) -> u32 {
@@ -101,12 +98,11 @@ impl TryFrom<&[u8]> for Chunk {
 
 impl Display for Chunk {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
+        writeln!(
             f,
-            "Chunk Length: {}, Chunk Type: {}, Chunk Data: {}",
-            self.length,
-            self.chunk_type,
-            String::from_utf8(self.chunk_data.clone()).unwrap()
+            "Chunk Type: {}, Chunk length: {}",
+            self.chunk_type(),
+            self.length(),
         )
     }
 }

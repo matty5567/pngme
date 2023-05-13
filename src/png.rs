@@ -3,8 +3,10 @@
 use crate::chunk::Chunk;
 use crate::{Error, Result};
 use std::fmt::Display;
-use std::io::{BufReader, Read};
+use std::fs::{read, OpenOptions};
+use std::io::{BufReader, Read, Write};
 
+#[derive(Debug)]
 pub struct Png {
     pub header: [u8; 8],
     chunks: Vec<Chunk>,
@@ -20,33 +22,52 @@ impl Png {
         }
     }
 
+    pub fn from_file(file_loc: &str) -> Self {
+        let data = read(file_loc).expect("Error reading input file");
+        Png::try_from(&data[..]).expect("Failed to decode png")
+    }
+
+    pub fn to_file(&self, file_loc: &str) -> Result<()> {
+        let mut file = OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .create(true)
+            .open(file_loc)
+            .expect("failed to open output file for writing");
+        file.write_all(&self.as_bytes())
+            .expect("Failed to write to output file");
+        Ok(())
+    }
+
     pub fn append_chunk(&mut self, chunk: Chunk) {
         self.chunks.push(chunk);
     }
 
     pub fn remove_chunk(&mut self, chunk_type: &str) -> Result<Chunk> {
-        if let Some(chunk) = self.chunks.pop() {
+        if let Some(index_of_chunk) = self
+            .chunks
+            .iter()
+            .position(|chunk| chunk.chunk_type().bytes() == chunk_type.as_bytes())
+        {
+            let chunk = self.chunks.swap_remove(index_of_chunk);
             Ok(chunk)
         } else {
-            Err("No chunks to remove")?
+            Err(format!("chunk {chunk_type} not found"))?
         }
     }
 
-    fn header(&self) -> &[u8; 8] {
-        &self.header
-    }
+    // fn header(&self) -> &[u8; 8] {
+    //     &self.header
+    // }
 
     fn chunks(&self) -> &[Chunk] {
         &self.chunks
     }
 
     pub fn chunk_by_type(&self, chunk_type: &str) -> Option<&Chunk> {
-        for chunk in &self.chunks {
-            if chunk.chunk_type().bytes() == chunk_type.as_bytes() {
-                return Some(&chunk);
-            }
-        }
-        None
+        self.chunks()
+            .iter()
+            .find(|&chunk| chunk.chunk_type().bytes() == chunk_type.as_bytes())
     }
 
     pub fn as_bytes(&self) -> Vec<u8> {
@@ -76,7 +97,7 @@ impl TryFrom<&[u8]> for Png {
 
         // read length of data chunk
         let mut chunk_length_buffer: [u8; 4] = [0; 4];
-        while let Ok(_) = reader.read_exact(&mut chunk_length_buffer) {
+        while reader.read_exact(&mut chunk_length_buffer).is_ok() {
             // create vector of length chunk
             let chunk_length = usize::try_from(u32::from_be_bytes(chunk_length_buffer))?;
 
@@ -92,17 +113,17 @@ impl TryFrom<&[u8]> for Png {
             chunks.push(chunk);
         }
 
-        return Ok(Png {
+        Ok(Png {
             header: Png::STANDARD_HEADER,
             chunks,
-        });
+        })
     }
 }
 
 impl Display for Png {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for chunk in &self.chunks {
-            write!(f, "{}", chunk)?;
+            write!(f, "{chunk}")?;
         }
         Ok(())
     }
